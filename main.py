@@ -1,6 +1,6 @@
 import streamlit as st
 import plotly.express as px
-from utils import extract_chain_and_token, fetch_data, get_token_holders, format_timestamp
+from utils import extract_chain_and_token, fetch_data, get_token_holders, format_timestamp, normalize_holder_entry
 
 def main():
     st.set_page_config(page_title="DexScreener Token Profile", layout="wide")
@@ -63,41 +63,51 @@ def main():
 
                 for label in ['m5', 'h1', 'h6', 'h24']:
                     st.markdown(f"**⏱ Time Frame: `{label}`**")
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Volume", f"${pair['volume'][label]:,.2f}")
-                    col2.metric("Buys", f"{pair['txns'][label]['buys']}")
-                    col3.metric("Sells", f"{pair['txns'][label]['sells']}")
-                    st.markdown(f"📈 **Price Change:** `{pair['priceChange'][label]}%`")
+                    volume = pair.get('volume', {}).get(label)
+                    txns = pair.get('txns', {}).get(label, {})
+                    price_change = pair.get('priceChange', {}).get(label)
+                    if volume is not None or txns:
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric("Volume", f"${volume:,.2f}" if volume is not None else "N/A")
+                        col2.metric("Buys", f"{txns.get('buys', 'N/A')}")
+                        col3.metric("Sells", f"{txns.get('sells', 'N/A')}")
+                        if price_change is not None:
+                            st.markdown(f"📈 **Price Change:** `{price_change}%`")
+                        else:
+                            st.markdown("📈 **Price Change:** `N/A`")
+                    else:
+                        st.markdown("⚠️ No data available for this time frame.")
                     st.markdown("---")
             
             st.subheader("🏦 Top Token Holders Distribution")
-            holders = get_token_holders(token_address)
+            holders = get_token_holders(token_address, chain_id)
 
             if holders:
                 num_to_plot = 100
                 top_holders = holders[:num_to_plot]
 
-                # Filter out incomplete entries
-                valid_holders = [
-                    h for h in top_holders
-                    if all(k in h for k in ['owner_address', 'percentage_relative_to_total_supply'])
+                # Normalize and filter entries
+                normalized = [
+                    normalize_holder_entry(h, chain_id)
+                    for h in top_holders
+                    if normalize_holder_entry(h, chain_id)["address"] and normalize_holder_entry(h, chain_id)["percent"] is not None
                 ]
 
                 addresses = [
-                    h['owner_address'][:6] + "..." + h['owner_address'][-4:]
-                    for h in valid_holders
+                    entry["address"][:6] + "..." + entry["address"][-4:]
+                    for entry in normalized
                 ]
-                percents = [
-                    h['percentage_relative_to_total_supply']
-                    for h in valid_holders
-                ]
+                percents = [entry["percent"] for entry in normalized]
+
+                # Plot using Plotly
+                import plotly.express as px
 
                 fig = px.bar(
                     x=addresses,
                     y=percents,
                     orientation='v',
                     labels={"x": "Holder", "y": "Percent of Supply"},
-                    title=f"Top {len(valid_holders)} Token Holders by % of Supply",
+                    title=f"Top {len(normalized)} Token Holders by % of Supply",
                     text=[f"{p:.2f}%" for p in percents]
                 )
 
@@ -109,15 +119,10 @@ def main():
                         automargin=True
                     ),
                     margin=dict(t=50, b=100, l=50, r=20),
-                    showlegend=False
+                    showlegend=False,
+                    width=max(1000, 10 * len(addresses))
                 )
 
-                # Force horizontal scroll by setting a very wide width
-                fig.update_layout(
-                    width=max(1000, 10 * len(addresses))  # Ensures scroll for wide charts
-                )
-
-                # Show with scrollable container
                 st.markdown("### 📈 Scroll to view all holders")
                 st.plotly_chart(fig, use_container_width=False)
 
