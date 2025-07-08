@@ -78,7 +78,7 @@ def main():
                     else:
                         st.markdown("⚠️ No data available for this time frame.")
                     st.markdown("---")
-            
+        
             st.subheader("🏦 Top Token Holders Distribution")
             holders = get_token_holders(token_address, chain_id)
 
