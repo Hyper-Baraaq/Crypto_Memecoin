@@ -38,7 +38,6 @@ def get_token_holders(token_address, chain_id):
         try:
             result = requests.request("GET", url, headers=headers)
             result = result.json()
-            print(result['result'][0].keys())
             return result['result']
         except Exception as e:
             st.error(f"❌ Error fetching token holders: {e}")
@@ -57,7 +56,6 @@ def get_token_holders(token_address, chain_id):
             api_key=MORALIS_API_KEY,
             params=params,
         )
-        print(result['result'][0].keys())
         return result['result']
     except Exception as e:
         st.error(f"❌ Error fetching token holders: {e}")
@@ -72,13 +70,20 @@ def format_timestamp(ms):
     
 
 def normalize_holder_entry(holder: dict, chain_id: str) -> dict:
-                if chain_id == "solana":
-                    return {
-                        "address": holder.get("ownerAddress"),
-                        "percent": holder.get("percentageRelativeToTotalSupply")
-                    }
-                else:
-                    return {
-                        "address": holder.get("owner_address"),
-                        "percent": holder.get("percentage_relative_to_total_supply")
-                    }
+    if chain_id == "solana":
+        return {
+            "address": holder.get("ownerAddress"),
+            "percent": holder.get("percentageRelativeToTotalSupply")
+        }
+    else:
+        return {
+            "address": holder.get("owner_address"),
+            "percent": holder.get("percentage_relative_to_total_supply")
+        }
+    
+def safe_get(d, *keys, default="Missing"):
+    for key in keys:
+        if not isinstance(d, dict) or key not in d:
+            return default
+        d = d[key]
+    return d
