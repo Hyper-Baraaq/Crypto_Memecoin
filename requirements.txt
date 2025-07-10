@@ -2,3 +2,6 @@ streamlit
 requests
 moralis
 python-dotenv
+plotly
+selenium
+beautifulsoup4
